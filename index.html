@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDO Survey Division — Detail Feature Code Database</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --paper:#F7F8F4;
+    --paper-line:#DADFD5;
+    --ink:#16232E;
+    --ink-soft:#3C4C56;
+    --ink-faint:#7E8A8F;
+    --accent:#C1421F;
+    --accent-dim:#E8D3CB;
+    --confirm:#2E6B58;
+    --confirm-dim:#D8E7E1;
+    --mark:#FFDD57;
+    --panel:#FFFFFF;
+    --border:#CBD2C8;
+    --mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --sidebar-w: 232px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    font-family:var(--sans);
+    color:var(--ink);
+    background:
+      linear-gradient(var(--paper-line) 1px, transparent 1px) 0 0/100% 28px,
+      linear-gradient(90deg, var(--paper-line) 1px, transparent 1px) 0 0/28px 100%,
+      var(--paper);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit;}
+  button{font-family:inherit;cursor:pointer;}
+  ::selection{background:var(--mark);}
+
+  /* ---------- layout ---------- */
+  .app{display:flex;min-height:100vh;}
+  .sidebar{
+    width:var(--sidebar-w);
+    background:var(--ink);
+    color:#DDE6E8;
+    flex-shrink:0;
+    position:sticky;top:0;height:100vh;
+    display:flex;flex-direction:column;
+    z-index:20;
+  }
+  .sidebar-brand{
+    padding:22px 20px 16px;
+    border-bottom:1px solid rgba(255,255,255,0.12);
+  }
+  .sidebar-brand .mark{
+    width:34px;height:34px;
+  }
+  .sidebar-brand h1{
+    font-size:13px;letter-spacing:0.02em;margin:12px 0 2px;font-weight:700;line-height:1.3;
+  }
+  .sidebar-brand p{
+    font-size:11px;color:#8CA0A6;margin:0;line-height:1.4;
+  }
+  nav.mainnav{padding:14px 10px;flex:1;}
+  nav.mainnav .navlabel{
+    font-size:10.5px; color:#5E747A; padding:10px 10px 6px; letter-spacing:0.04em;
+  }
+  nav.mainnav button{
+    display:flex;align-items:center;gap:10px;
+    width:100%;text-align:left;background:none;border:none;
+    color:#C7D3D6;font-size:13.5px;padding:10px 10px;border-radius:3px;
+    margin-bottom:2px;
+  }
+  nav.mainnav button svg{flex-shrink:0;opacity:0.75;}
+  nav.mainnav button:hover{background:rgba(255,255,255,0.06);color:#fff;}
+  nav.mainnav button.active{background:var(--accent);color:#fff;}
+  nav.mainnav button.active svg{opacity:1;}
+  .sidebar-foot{
+    padding:14px 20px;border-top:1px solid rgba(255,255,255,0.12);
+    font-size:10.5px;color:#5E747A;line-height:1.5;
+  }
+
+  .main{flex:1;min-width:0;padding:26px 34px 60px;}
+
+  /* title block, drafting-style */
+  .titleblock{
+    border:1.5px solid var(--ink);
+    background:var(--panel);
+    display:grid;
+    grid-template-columns:1fr auto;
+    margin-bottom:26px;
+  }
+  .titleblock-main{padding:16px 22px;border-right:1.5px solid var(--ink);}
+  .titleblock-main .eyebrow{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:0.03em;}
+  .titleblock-main h2{margin:4px 0 0;font-size:22px;letter-spacing:0.01em;}
+  .titleblock-main .sub{margin:2px 0 0;font-size:12.5px;color:var(--ink-faint);}
+  .titleblock-meta{display:grid;grid-template-columns:1fr 1fr;font-family:var(--mono);font-size:10.5px;}
+  .titleblock-meta div{padding:7px 14px;border-bottom:1px solid var(--border);min-width:110px;}
+  .titleblock-meta div:nth-last-child(-n+2){border-bottom:none;}
+  .titleblock-meta div:nth-child(odd){border-right:1px solid var(--border);}
+  .titleblock-meta .k{display:block;color:var(--ink-faint);font-size:9px;letter-spacing:0.03em;}
+  .titleblock-meta .v{display:block;margin-top:2px;color:var(--ink);}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* global search */
+  .globalsearch{
+    display:flex;gap:0;border:1.5px solid var(--ink);background:var(--panel);
+    margin-bottom:22px;
+  }
+  .globalsearch input{
+    flex:1;border:none;outline:none;padding:14px 16px;font-size:15px;font-family:var(--mono);background:transparent;color:var(--ink);
+  }
+  .globalsearch .tag{
+    display:flex;align-items:center;padding:0 14px;font-size:10.5px;color:var(--ink-faint);
+    border-left:1px solid var(--border);letter-spacing:0.02em;
+  }
+  .globalsearch button.clear{
+    border:none;background:var(--ink);color:#fff;padding:0 18px;font-size:12px;letter-spacing:0.02em;
+  }
+  .globalsearch button.clear:hover{background:var(--accent);}
+
+  /* stat cards */
+  .statgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:26px;}
+  .statcard{border:1px solid var(--border);background:var(--panel);padding:16px 18px;position:relative;}
+  .statcard::before{content:"";position:absolute;top:0;left:0;width:3px;height:100%;background:var(--accent);}
+  .statcard .n{font-family:var(--mono);font-size:30px;font-weight:600;line-height:1;}
+  .statcard .l{font-size:11.5px;color:var(--ink-faint);margin-top:8px;}
+
+  .panel{border:1px solid var(--border);background:var(--panel);margin-bottom:22px;}
+  .panel-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:12px 18px;border-bottom:1px solid var(--border);
+  }
+  .panel-head h3{margin:0;font-size:13.5px;letter-spacing:0.01em;}
+  .panel-head .hint{font-size:11px;color:var(--ink-faint);}
+  .panel-body{padding:18px;}
+
+  /* tables */
+  table.datatable{width:100%;border-collapse:collapse;font-size:13px;}
+  table.datatable th{
+    text-align:left;font-size:10.5px;color:var(--ink-faint);letter-spacing:0.03em;
+    padding:9px 12px;border-bottom:1.5px solid var(--ink);cursor:pointer;user-select:none;white-space:nowrap;
+  }
+  table.datatable th span.arrow{margin-left:4px;font-size:9px;opacity:0.6;}
+  table.datatable td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  table.datatable tbody tr:hover{background:#F2F5F0;cursor:pointer;}
+  table.datatable td.code{font-family:var(--mono);font-weight:600;}
+  table.datatable td.lcode{font-family:var(--mono);}
+  .catpill{
+    display:inline-block;font-size:10px;padding:2px 7px;border-radius:2px;
+    background:var(--confirm-dim);color:var(--confirm);letter-spacing:0.01em;
+  }
+  mark{background:var(--mark);color:inherit;padding:0 1px;border-radius:1px;}
+  .copybtn{
+    border:1px solid var(--border);background:#fff;padding:3px 8px;font-size:10.5px;
+    border-radius:2px;color:var(--ink-soft);
+  }
+  .copybtn:hover{border-color:var(--ink);color:var(--ink);}
+  .rowcount{font-size:11.5px;color:var(--ink-faint);}
+  .empty-state{padding:40px 18px;text-align:center;color:var(--ink-faint);font-size:13px;}
+  .empty-state .big{font-size:26px;display:block;margin-bottom:6px;}
+
+  .pagination{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border);font-size:12px;}
+  .pagination .pages{display:flex;gap:4px;}
+  .pagination button{border:1px solid var(--border);background:#fff;padding:5px 10px;font-size:12px;border-radius:2px;}
+  .pagination button.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .pagination button:disabled{opacity:0.35;cursor:default;}
+
+  /* lookup tool layout */
+  .lookup-grid{display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start;}
+  .lookup-input{padding:18px;}
+  .lookup-input label{display:block;font-size:11px;color:var(--ink-faint);margin-bottom:6px;letter-spacing:0.02em;}
+  .lookup-input input{
+    width:100%;font-family:var(--mono);font-size:20px;padding:12px 14px;border:1.5px solid var(--ink);outline:none;
+  }
+  .lookup-input input:focus{border-color:var(--accent);}
+  .lookup-result-card{border:1px solid var(--border);padding:16px;margin-top:14px;background:#FAFBF8;}
+  .lookup-result-card + .lookup-result-card{margin-top:10px;}
+  .lookup-result-card .code-badge{
+    font-family:var(--mono);font-size:22px;font-weight:700;color:var(--accent);
+  }
+  .lookup-result-card .lname{font-size:16px;margin:4px 0;}
+  .lookup-result-card .meta{font-size:11.5px;color:var(--ink-faint);}
+  .lookup-result-card .meta code{font-family:var(--mono);background:#EFF1EA;padding:1px 5px;border-radius:2px;}
+
+  /* filters */
+  .filterbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+  .filterbar select, .filterbar input[type=text]{
+    padding:8px 10px;border:1px solid var(--border);font-size:12.5px;background:#fff;font-family:var(--sans);
+  }
+  .filterbar .spacer{flex:1;}
+
+  /* detail panel (slide-over) */
+  .overlay{
+    position:fixed;inset:0;background:rgba(22,35,46,0.35);z-index:50;display:none;
+  }
+  .overlay.show{display:block;}
+  .detailpanel{
+    position:fixed;top:0;right:0;height:100vh;width:420px;max-width:92vw;
+    background:var(--panel);z-index:51;transform:translateX(100%);transition:transform .18s ease;
+    box-shadow:-6px 0 24px rgba(0,0,0,0.15);display:flex;flex-direction:column;
+  }
+  .detailpanel.show{transform:translateX(0);}
+  .detailpanel-head{
+    padding:16px 20px;border-bottom:1.5px solid var(--ink);display:flex;justify-content:space-between;align-items:flex-start;
+  }
+  .detailpanel-head .eyebrow{font-family:var(--mono);font-size:10.5px;color:var(--accent);}
+  .detailpanel-head h3{margin:4px 0 0;font-size:19px;}
+  .detailpanel-head button.x{border:none;background:none;font-size:20px;color:var(--ink-faint);line-height:1;padding:2px;}
+  .detailpanel-body{padding:18px 20px;overflow-y:auto;flex:1;}
+  .dfield{margin-bottom:16px;}
+  .dfield .k{font-size:10.5px;color:var(--ink-faint);letter-spacing:0.03em;display:block;margin-bottom:4px;}
+  .dfield .v{font-size:15px;}
+  .dfield .v.mono{font-family:var(--mono);}
+  .dfield .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;}
+  .chip{font-family:var(--mono);font-size:12px;background:#EFF1EA;border:1px solid var(--border);padding:3px 8px;border-radius:2px;}
+  .detailpanel-foot{padding:16px 20px;border-top:1px solid var(--border);display:flex;gap:10px;}
+
+  /* buttons */
+  .btn{
+    border:1px solid var(--ink);background:var(--ink);color:#fff;padding:9px 16px;font-size:12.5px;border-radius:2px;letter-spacing:0.01em;
+  }
+  .btn:hover{background:var(--accent);border-color:var(--accent);}
+  .btn.secondary{background:#fff;color:var(--ink);}
+  .btn.secondary:hover{background:#F2F5F0;border-color:var(--ink);color:var(--ink);}
+  .btn.danger{background:#fff;color:var(--accent);border-color:var(--accent);}
+  .btn.danger:hover{background:var(--accent);color:#fff;}
+  .btn:disabled{opacity:0.4;cursor:default;background:#fff;color:var(--ink-faint);border-color:var(--border);}
+
+  /* admin */
+  .admin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .admin-card{border:1px solid var(--border);background:var(--panel);padding:18px;}
+  .admin-card h4{margin:0 0 6px;font-size:13.5px;}
+  .admin-card p{margin:0 0 14px;font-size:12px;color:var(--ink-faint);line-height:1.5;}
+  .formrow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+  .formrow.full{grid-template-columns:1fr;}
+  .formrow label{display:block;font-size:11px;color:var(--ink-faint);margin-bottom:5px;}
+  .formrow input, .formrow select{width:100%;padding:9px 10px;border:1px solid var(--border);font-size:13px;font-family:var(--sans);}
+  .formrow input[name=code],.formrow input[name=layerCode]{font-family:var(--mono);}
+  .changelog{font-size:11.5px;color:var(--ink-faint);}
+  .changelog li{margin-bottom:4px;}
+  .badge-modified{font-size:9.5px;background:var(--accent-dim);color:var(--accent);padding:1px 6px;border-radius:2px;margin-left:6px;}
+  .badge-new{font-size:9.5px;background:var(--confirm-dim);color:var(--confirm);padding:1px 6px;border-radius:2px;margin-left:6px;}
+  .toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--ink);color:#fff;padding:10px 20px;font-size:12.5px;border-radius:3px;z-index:99;
+    opacity:0;pointer-events:none;transition:opacity .2s ease;
+  }
+  .toast.show{opacity:1;}
+
+  @media (max-width: 880px){
+    .sidebar{position:fixed;left:0;transform:translateX(-100%);transition:transform .2s ease;}
+    .sidebar.open{transform:translateX(0);}
+    .main{padding:18px 16px 60px;}
+    .titleblock{grid-template-columns:1fr;}
+    .titleblock-main{border-right:none;border-bottom:1.5px solid var(--ink);}
+    .titleblock-meta{grid-template-columns:1fr;}
+    .statgrid{grid-template-columns:repeat(2,1fr);}
+    .lookup-grid{grid-template-columns:1fr;}
+    .admin-grid{grid-template-columns:1fr;}
+    .formrow{grid-template-columns:1fr;}
+    table.datatable{font-size:12px;}
+    .menubtn{display:inline-flex !important;}
+  }
+  .menubtn{display:none;border:1px solid var(--border);background:#fff;padding:8px 10px;margin-bottom:14px;font-size:12px;}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <svg class="mark" viewBox="0 0 34 34" fill="none">
+        <circle cx="17" cy="17" r="15.5" stroke="#C1421F" stroke-width="1.4"/>
+        <path d="M17 3 V31 M3 17 H31" stroke="#5E747A" stroke-width="1"/>
+        <circle cx="17" cy="17" r="3.4" fill="#C1421F"/>
+      </svg>
+      <h1>PDO SURVEY DIVISION</h1>
+      <p>Detail Feature Code Database</p>
+    </div>
+    <nav class="mainnav">
+      <div class="navlabel">Navigate</div>
+      <button data-view="dashboard" class="active">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" stroke="currentColor"/><rect x="9" y="1" width="6" height="6" stroke="currentColor"/><rect x="1" y="9" width="6" height="6" stroke="currentColor"/><rect x="9" y="9" width="6" height="6" stroke="currentColor"/></svg>
+        Dashboard
+      </button>
+      <button data-view="codesearch">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor"/><path d="M11 11L15 15" stroke="currentColor"/></svg>
+        Code Search
+      </button>
+      <button data-view="layerlookup">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M2 4H14M2 8H14M2 12H10" stroke="currentColor"/></svg>
+        Layer Code Lookup
+      </button>
+      <button data-view="database">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="3.4" rx="6" ry="2.2" stroke="currentColor"/><path d="M2 3.4V12.6C2 13.8 4.7 14.8 8 14.8C11.3 14.8 14 13.8 14 12.6V3.4" stroke="currentColor"/><path d="M2 8C2 9.2 4.7 10.2 8 10.2C11.3 10.2 14 9.2 14 8" stroke="currentColor"/></svg>
+        Feature Database
+      </button>
+      <button data-view="datamanagement">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1V6M8 6L5.5 4M8 6L10.5 4" stroke="currentColor"/><rect x="2" y="9" width="12" height="6" stroke="currentColor"/></svg>
+        Data Management
+      </button>
+    </nav>
+    <div class="sidebar-foot">
+      Dawood Engineering Consultancy<br>PDO Survey Division · Detail Feature Coding
+    </div>
+  </aside>
+
+  <main class="main">
+    <button class="menubtn" id="menuBtn">☰ Menu</button>
+
+    <div class="titleblock">
+      <div class="titleblock-main">
+        <div class="eyebrow" id="viewEyebrow">DASHBOARD</div>
+        <h2 id="viewTitle">Detail Feature Code Database</h2>
+        <p class="sub" id="viewSub">Master reference for CAD / GIS survey layer coding</p>
+      </div>
+      <div class="titleblock-meta">
+        <div><span class="k">Division</span><span class="v">Survey</span></div>
+        <div><span class="k">Source</span><span class="v" id="metaSource">PDO_LAYER_CODELIST.xlsx</span></div>
+        <div><span class="k">Records</span><span class="v" id="metaRecords">—</span></div>
+        <div><span class="k">Status</span><span class="v" id="metaStatus">Master data</span></div>
+      </div>
+    </div>
+
+    <!-- ============ DASHBOARD ============ -->
+    <section class="view active" id="view-dashboard">
+      <div class="globalsearch">
+        <input type="text" id="globalSearchInput" placeholder="Search Feature Code / Layer Name / Layer Code — e.g. 545, AC, AIRCONDITIONER">
+        <div class="tag">ALL FIELDS</div>
+        <button class="clear" id="globalClearBtn">CLEAR</button>
+      </div>
+
+      <div class="statgrid">
+        <div class="statcard"><div class="n" id="statCodes">0</div><div class="l">Total Feature Codes</div></div>
+        <div class="statcard"><div class="n" id="statNames">0</div><div class="l">Total Layer Names</div></div>
+        <div class="statcard"><div class="n" id="statLayerCodes">0</div><div class="l">Total Layer Codes</div></div>
+        <div class="statcard"><div class="n" id="statCategories">0</div><div class="l">Feature Categories</div></div>
+      </div>
+
+      <div class="panel" id="dashResultsPanel" style="display:none;">
+        <div class="panel-head">
+          <h3>Search Results</h3>
+          <span class="rowcount" id="dashRowCount"></span>
+        </div>
+        <div id="dashTableWrap"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Feature codes by category</h3></div>
+        <div class="panel-body" id="categoryBreakdown"></div>
+      </div>
+    </section>
+
+    <!-- ============ CODE SEARCH ============ -->
+    <section class="view" id="view-codesearch">
+      <div class="panel">
+        <div class="panel-head"><h3>Search by Code No.</h3><span class="hint">Exact or partial numeric match</span></div>
+        <div class="panel-body">
+          <div class="lookup-grid">
+            <div class="lookup-input">
+              <label>Code Number</label>
+              <input type="text" id="codeSearchInput" inputmode="numeric" placeholder="e.g. 545">
+            </div>
+            <div id="codeSearchResults"><div class="empty-state"><span class="big">#</span>Enter a code number to look up its layer name and layer code.</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ LAYER CODE LOOKUP ============ -->
+    <section class="view" id="view-layerlookup">
+      <div class="panel">
+        <div class="panel-head"><h3>Search by Layer Code</h3><span class="hint">Case-insensitive · matches multi-code entries like "AS,HEL"</span></div>
+        <div class="panel-body">
+          <div class="lookup-grid">
+            <div class="lookup-input">
+              <label>Layer Code</label>
+              <input type="text" id="layerSearchInput" placeholder="e.g. AC">
+            </div>
+            <div id="layerSearchResults"><div class="empty-state"><span class="big">§</span>Enter a layer code to find its feature and code number.</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h3>Search by Layer Name</h3><span class="hint">Case-insensitive · partial text matching</span></div>
+        <div class="panel-body">
+          <div class="lookup-grid">
+            <div class="lookup-input">
+              <label>Layer Name</label>
+              <input type="text" id="nameSearchInput" placeholder="e.g. ROAD, PIPE, BUILDING">
+            </div>
+            <div id="nameSearchResults"><div class="empty-state"><span class="big">A–Z</span>Enter part of a feature/layer name.</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FEATURE DATABASE ============ -->
+    <section class="view" id="view-database">
+      <div class="panel">
+        <div class="panel-head"><h3>Full Feature Database</h3><span class="rowcount" id="dbRowCount"></span></div>
+        <div class="panel-body" style="padding-bottom:0;">
+          <div class="filterbar">
+            <input type="text" id="dbFilterInput" placeholder="Filter code / name / layer code…" style="min-width:240px;">
+            <select id="dbCategoryFilter"><option value="">All categories</option></select>
+            <div class="spacer"></div>
+            <button class="btn secondary" id="dbExportCsvBtn">Export CSV</button>
+            <button class="btn secondary" id="dbExportXlsxBtn">Export Excel</button>
+          </div>
+        </div>
+        <div id="dbTableWrap"></div>
+        <div class="pagination" id="dbPagination"></div>
+      </div>
+    </section>
+
+    <!-- ============ DATA MANAGEMENT ============ -->
+    <section class="view" id="view-datamanagement">
+      <div class="admin-grid">
+        <div class="admin-card">
+          <h4>Import Excel</h4>
+          <p>Import feature codes from an .xlsx/.csv file (columns: CODE NO., LAYER NAME, LAYER CODE). Imported rows are added on top of the master dataset.</p>
+          <input type="file" id="importFile" accept=".xlsx,.xls,.csv">
+        </div>
+        <div class="admin-card">
+          <h4>Export Database</h4>
+          <p>Download the current working dataset — master data plus any additions, edits, or deletions made below.</p>
+          <button class="btn secondary" id="exportCsvBtn" style="margin-right:8px;">Export CSV</button>
+          <button class="btn secondary" id="exportXlsxBtn">Export Excel</button>
+        </div>
+        <div class="admin-card">
+          <h4>Refresh / Reload</h4>
+          <p>Discard all local additions, edits and deletions, and restore the original master dataset from LAYER CODELIST.xlsx.</p>
+          <button class="btn danger" id="reloadBtn">Reload Master Data</button>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-head"><h3 id="formTitle">Add New Feature</h3><span class="hint" id="formHint">Feature codes must be unique</span></div>
+        <div class="panel-body">
+          <form id="featureForm">
+            <input type="hidden" name="editId" value="">
+            <div class="formrow">
+              <div>
+                <label>Code No.</label>
+                <input type="text" name="code" required inputmode="numeric">
+              </div>
+              <div>
+                <label>Layer Name</label>
+                <input type="text" name="name" required>
+              </div>
+            </div>
+            <div class="formrow">
+              <div>
+                <label>Layer Code(s) — comma separated</label>
+                <input type="text" name="layerCode" required placeholder="e.g. AS,HEL">
+              </div>
+              <div>
+                <label>Category</label>
+                <select name="category">
+                  <option>Road</option><option>Utility</option><option>Structure</option>
+                  <option>Drainage</option><option>Vegetation</option><option>Survey Control</option>
+                  <option selected>General</option>
+                </select>
+              </div>
+            </div>
+            <div class="formrow full">
+              <div>
+                <label>Description (optional)</label>
+                <input type="text" name="description">
+              </div>
+            </div>
+            <button class="btn" type="submit" id="formSubmitBtn">Add Feature</button>
+            <button class="btn secondary" type="button" id="formCancelBtn" style="display:none;">Cancel Edit</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h3>Manage Records</h3>
+          <span class="hint">Click Edit or Delete on any row · changes persist in this browser</span>
+        </div>
+        <div class="panel-body" style="padding-bottom:0;">
+          <input type="text" id="adminFilterInput" placeholder="Filter records to manage…" style="width:100%;max-width:340px;">
+        </div>
+        <div id="adminTableWrap"></div>
+        <div class="pagination" id="adminPagination"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="overlay" id="overlay"></div>
+<div class="detailpanel" id="detailPanel">
+  <div class="detailpanel-head">
+    <div>
+      <div class="eyebrow">FEATURE DETAIL</div>
+      <h3 id="dpName">—</h3>
+    </div>
+    <button class="x" id="dpClose">&times;</button>
+  </div>
+  <div class="detailpanel-body" id="dpBody"></div>
+  <div class="detailpanel-foot">
+    <button class="btn" id="dpCopyCode">Copy Code</button>
+    <button class="btn secondary" id="dpCopyLayer">Copy Layer Code</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script id="master-data" type="application/json">[{"id":5,"code":545,"name":"AIRCONDITIONER","layerCode":"AC","layerCodes":["AC"],"category":"Utility","description":""},{"id":6,"code":70,"name":"AIRSTRIP/HELIBASE","layerCode":"AS,HEL","layerCodes":["AS","HEL"],"category":"General","description":""},{"id":7,"code":227,"name":"FIRE ALARM","layerCode":"FA","layerCodes":["FA"],"category":"Utility","description":""},{"id":8,"code":360,"name":"ANGLE IRON","layerCode":"AI","layerCodes":["AI"],"category":"General","description":""},{"id":9,"code":78,"name":"SCRAPED AREA","layerCode":"SA","layerCodes":["SA"],"category":"General","description":""},{"id":10,"code":55,"name":"BARRIER","layerCode":"BAR","layerCodes":["BAR"],"category":"Structure","description":""},{"id":11,"code":80,"name":"FLOWER BED","layerCode":"FB","layerCodes":["FB"],"category":"Utility","description":""},{"id":12,"code":186,"name":"SIGN BOARD","layerCode":"SB","layerCodes":["SB"],"category":"Structure","description":""},{"id":13,"code":337,"name":"SWITCH BOARD","layerCode":"SWB","layerCodes":["SWB"],"category":"Utility","description":""},{"id":14,"code":45,"name":"BOUNDARY","layerCode":"BO","layerCodes":["BO"],"category":"Survey Control","description":""},{"id":15,"code":53,"name":"BOUNDARY CADASTRAL","layerCode":"BO CAD","layerCodes":["BO CAD"],"category":"Survey Control","description":""},{"id":16,"code":46,"name":"BOUNDARY, FARM","layerCode":"BO FARM","layerCodes":["BO FARM"],"category":"Survey Control","description":""},{"id":17,"code":52,"name":"BOUNDARY, INTERNATIONAL","layerCode":"BO INTER","layerCodes":["BO INTER"],"category":"Survey Control","description":""},{"id":18,"code":49,"name":"BOUNDARY, OTHER (UNDEFINED)","layerCode":"BO OTHER","layerCodes":["BO OTHER"],"category":"Survey Control","description":""},{"id":19,"code":51,"name":"BOUNDARY, OTHER CONCESSION","layerCode":"BO CON","layerCodes":["BO CON"],"category":"Survey Control","description":""},{"id":20,"code":50,"name":"BOUNDARY, PDO CONCESSION","layerCode":"BO PDO","layerCodes":["BO PDO"],"category":"Survey Control","description":""},{"id":21,"code":47,"name":"BOUNDARY, VILLAGE","layerCode":"BO VILLAGE","layerCodes":["BO VILLAGE"],"category":"Survey Control","description":""},{"id":22,"code":515,"name":"BOX, ELECTRICAL DISTRIBUTION","layerCode":"DB","layerCodes":["DB"],"category":"Utility","description":""},{"id":23,"code":516,"name":"BOX, ELECTRICAL JUNCTION","layerCode":"EJB","layerCodes":["EJB"],"category":"Utility","description":""},{"id":24,"code":224,"name":"BOX, EQUIPMENT, FIRE","layerCode":"FB","layerCodes":["FB"],"category":"General","description":""},{"id":25,"code":415,"name":"BOX, POST","layerCode":"PB","layerCodes":["PB"],"category":"Structure","description":""},{"id":26,"code":517,"name":"BOX, SWITCH","layerCode":"SWBX","layerCodes":["SWBX"],"category":"Utility","description":""},{"id":27,"code":118,"name":"BOX, TELEPHONE","layerCode":"TB","layerCodes":["TB"],"category":"Utility","description":""},{"id":28,"code":518,"name":"BOX, TELEPHONE DISTRIBUTION","layerCode":"TDB","layerCodes":["TDB"],"category":"Utility","description":""},{"id":29,"code":97,"name":"BRIDGE","layerCode":"BRIDGE","layerCodes":["BRIDGE"],"category":"General","description":""},{"id":30,"code":40,"name":"BUILDING/GATHERING STATION","layerCode":"BUILD","layerCodes":["BUILD"],"category":"Survey Control","description":""},{"id":31,"code":25,"name":"BUND","layerCode":"BUND","layerCodes":["BUND"],"category":"General","description":""},{"id":32,"code":81,"name":"CABIN, PORTA","layerCode":"CABIN","layerCodes":["CABIN"],"category":"General","description":""},{"id":33,"code":726,"name":"CABLE, ABOVE GROUND LEVEL, CATHODIC PROTECTION","layerCode":"CP AG","layerCodes":["CP AG"],"category":"Utility","description":""},{"id":34,"code":728,"name":"CABLE, ABOVE GROUND LEVEL, EARTHING","layerCode":"EC AG","layerCodes":["EC AG"],"category":"Utility","description":""},{"id":35,"code":725,"name":"CABLE, ABOVE GROUND LEVEL, ELECTRIC","layerCode":"ELC AG","layerCodes":["ELC AG"],"category":"Utility","description":""},{"id":36,"code":729,"name":"CABLE, ABOVE GROUND LEVEL, INSTRUMENT","layerCode":"IC AG","layerCodes":["IC AG"],"category":"Utility","description":""},{"id":37,"code":727,"name":"CABLE, ABOVE GROUND LEVEL, TELEPHONE","layerCode":"TC AG","layerCodes":["TC AG"],"category":"Utility","description":""},{"id":38,"code":730,"name":"CABLE, ABOVE GROUND LEVEL, UNDEFINED","layerCode":"UC AG","layerCodes":["UC AG"],"category":"Utility","description":""},{"id":39,"code":710,"name":"CABLE, BURIED, CATHODIC PROTECTION","layerCode":"CP UG","layerCodes":["CP UG"],"category":"Utility","description":""},{"id":40,"code":714,"name":"CABLE, BURIED, EARTHING","layerCode":"EC UG","layerCodes":["EC UG"],"category":"Utility","description":""},{"id":41,"code":711,"name":"CABLE, BURIED, ELECTRIC, HIGH TENSION","layerCode":"EL HT UG","layerCodes":["EL HT UG"],"category":"Utility","description":""},{"id":42,"code":712,"name":"CABLE, BURIED, ELECTRIC, LOW TENSION","layerCode":"EL LT UG","layerCodes":["EL LT UG"],"category":"Utility","description":""},{"id":43,"code":715,"name":"CABLE, BURIED, INSTRUMENT","layerCode":"IC UG","layerCodes":["IC UG"],"category":"Utility","description":""},{"id":44,"code":713,"name":"CABLE, BURIED, TELEPHONE","layerCode":"TELC UG","layerCodes":["TELC UG"],"category":"Utility","description":""},{"id":45,"code":716,"name":"CABLE, BURIED, UNDEFINED","layerCode":"UC UG","layerCodes":["UC UG"],"category":"Utility","description":""},{"id":46,"code":701,"name":"CABLE, OVERHEAD, ELECTRIC, HIGH TENSION","layerCode":"OHL HT","layerCodes":["OHL HT"],"category":"Utility","description":""},{"id":47,"code":702,"name":"CABLE, OVERHEAD, ELECTRIC, LOW TENSION","layerCode":"OHL LT","layerCodes":["OHL LT"],"category":"Utility","description":""},{"id":48,"code":703,"name":"CABLE, OVERHEAD, TELEPHONE","layerCode":"TC OH","layerCodes":["TC OH"],"category":"Utility","description":""},{"id":49,"code":704,"name":"CABLE, OVERHEAD, UNDEFINED","layerCode":"UC OH","layerCodes":["UC OH"],"category":"Utility","description":""},{"id":50,"code":718,"name":"CABLE, SURFACE, CATHODIC PROTECTION","layerCode":"CP SURFACE","layerCodes":["CP SURFACE"],"category":"Utility","description":""},{"id":51,"code":720,"name":"CABLE, SURFACE, EARTHING","layerCode":"EC SURFACE","layerCodes":["EC SURFACE"],"category":"Utility","description":""},{"id":52,"code":717,"name":"CABLE, SURFACE, ELECTRIC","layerCode":"ELEC SURFACE","layerCodes":["ELEC SURFACE"],"category":"Utility","description":""},{"id":53,"code":721,"name":"CABLE, SURFACE, INSTRUMENT","layerCode":"IC SURFACE","layerCodes":["IC SURFACE"],"category":"Utility","description":""},{"id":54,"code":719,"name":"CABLE, SURFACE, TELEPHONE","layerCode":"TC SUURFACE","layerCodes":["TC SUURFACE"],"category":"Utility","description":""},{"id":55,"code":722,"name":"CABLE, SURFACE, UNDEFINED","layerCode":"UC SURFACE","layerCodes":["UC SURFACE"],"category":"Utility","description":""},{"id":56,"code":176,"name":"CHAMBER/COVER, INSPECTION","layerCode":"INSP CH","layerCodes":["INSP CH"],"category":"General","description":""},{"id":57,"code":33,"name":"CLIFF, BOTTOM","layerCode":"CLIFF BOTTOM","layerCodes":["CLIFF BOTTOM"],"category":"General","description":""},{"id":58,"code":32,"name":"CLIFF, TOP","layerCode":"CLIFF TOP","layerCodes":["CLIFF TOP"],"category":"General","description":""},{"id":59,"code":67,"name":"CONCRETE, BASE/SLAB/PLATFORM","layerCode":"PLATFORM CONC","layerCodes":["PLATFORM CONC"],"category":"Structure","description":""},{"id":60,"code":68,"name":"CONCRETE, BLOCK/SUPPORT","layerCode":"BLOCK CONCRETE","layerCodes":["BLOCK CONCRETE"],"category":"General","description":""},{"id":61,"code":177,"name":"CP (CATHODIC PROTECTION)","layerCode":"CP","layerCodes":["CP"],"category":"General","description":""},{"id":62,"code":169,"name":"CP ANODE JUNCTION BOX","layerCode":"CP BOX","layerCodes":["CP BOX"],"category":"Utility","description":""},{"id":63,"code":173,"name":"CP CORROSION MONITORING PIT","layerCode":"CP PIT","layerCodes":["CP PIT"],"category":"General","description":""},{"id":64,"code":167,"name":"CP DRAIN POINT","layerCode":"CP DRAIN","layerCodes":["CP DRAIN"],"category":"Drainage","description":""},{"id":65,"code":170,"name":"CP MAGNET MARKER","layerCode":"CP MAGNET","layerCodes":["CP MAGNET"],"category":"General","description":""},{"id":66,"code":165,"name":"CP MARKER STANDARD/UNDEFINED","layerCode":"CP MARKER","layerCodes":["CP MARKER"],"category":"General","description":""},{"id":67,"code":164,"name":"CP MEASURE CONTACT","layerCode":"CP CONTACT MEAS","layerCodes":["CP CONTACT MEAS"],"category":"General","description":""},{"id":68,"code":172,"name":"CP NEGATIVE DISTRIBUTION BOX","layerCode":"CP DB","layerCodes":["CP DB"],"category":"General","description":""},{"id":69,"code":166,"name":"CP NEGATIVE JUNCTION BOX","layerCode":"CP JB","layerCodes":["CP JB"],"category":"Utility","description":""},{"id":70,"code":168,"name":"CP TEST POINT","layerCode":"CP TEST","layerCodes":["CP TEST"],"category":"General","description":""},{"id":71,"code":171,"name":"CP TRANSFORMER RECTIFIER","layerCode":"CP TRANS","layerCodes":["CP TRANS"],"category":"Utility","description":""},{"id":72,"code":162,"name":"CP WELL","layerCode":"CP WELL","layerCodes":["CP WELL"],"category":"General","description":""},{"id":73,"code":77,"name":"CULVERT","layerCode":"CULVERT","layerCodes":["CULVERT"],"category":"Drainage","description":""},{"id":74,"code":26,"name":"DITCH","layerCode":"DITCH","layerCodes":["DITCH"],"category":"General","description":""},{"id":75,"code":27,"name":"DRAIN/GUTTER","layerCode":"DRAIN","layerCodes":["DRAIN"],"category":"Drainage","description":""},{"id":76,"code":75,"name":"DUCT","layerCode":"DUCT","layerCodes":["DUCT"],"category":"Utility","description":""},{"id":77,"code":35,"name":"EMBANKMENT/SLOPE, MANMADE/CONCRETE, BOTTOM","layerCode":"EMB BOT","layerCodes":["EMB BOT"],"category":"General","description":""},{"id":78,"code":34,"name":"EMBANKMENT/SLOPE, MANMADE/CONCRETE, TOP","layerCode":"EMB TOP","layerCodes":["EMB TOP"],"category":"General","description":""},{"id":79,"code":37,"name":"EMBANKMENT/SLOPE, NATURAL, BOTTOM","layerCode":"EMB BOT NAT","layerCodes":["EMB BOT NAT"],"category":"General","description":""},{"id":80,"code":36,"name":"EMBANKMENT/SLOPE, NATURAL, TOP","layerCode":"EMB TOP NAT","layerCodes":["EMB TOP NAT"],"category":"General","description":""},{"id":81,"code":28,"name":"EXCAVATION","layerCode":"EXCAVATION","layerCodes":["EXCAVATION"],"category":"General","description":""},{"id":82,"code":23,"name":"FALAJ CENTRE LINE","layerCode":"FAJAL CEN","layerCodes":["FAJAL CEN"],"category":"General","description":""},{"id":83,"code":24,"name":"FALAJ EDGE OF","layerCode":"FAJAL EDGE","layerCodes":["FAJAL EDGE"],"category":"General","description":""},{"id":84,"code":56,"name":"FENCE","layerCode":"FENCE","layerCodes":["FENCE"],"category":"Structure","description":""},{"id":85,"code":187,"name":"FLARE","layerCode":"FLARE","layerCodes":["FLARE"],"category":"General","description":""},{"id":86,"code":643,"name":"FLOWLINE, ABOVE GROUND LEVEL, DISUSED/REDUNDANT","layerCode":"FL DISUSED AG","layerCodes":["FL DISUSED AG"],"category":"Utility","description":""},{"id":87,"code":644,"name":"FLOWLINE, ABOVE GROUND LEVEL, FIRE WATER","layerCode":"FL FIRE AG","layerCodes":["FL FIRE AG"],"category":"Utility","description":""},{"id":88,"code":638,"name":"FLOWLINE, ABOVE GROUND LEVEL, GAS","layerCode":"FL GAS AG","layerCodes":["FL GAS AG"],"category":"Utility","description":""},{"id":89,"code":637,"name":"FLOWLINE, ABOVE GROUND LEVEL, OIL","layerCode":"FL OIL AG","layerCodes":["FL OIL AG"],"category":"Utility","description":""},{"id":90,"code":639,"name":"FLOWLINE, ABOVE GROUND LEVEL, POTABLE WATER","layerCode":"FL POT AG","layerCodes":["FL POT AG"],"category":"Utility","description":""},{"id":91,"code":640,"name":"FLOWLINE, ABOVE GROUND LEVEL, SALT WATER","layerCode":"FL SALT WATER","layerCodes":["FL SALT WATER"],"category":"Utility","description":""},{"id":92,"code":641,"name":"FLOWLINE, ABOVE GROUND LEVEL, SEWAGE WATER","layerCode":"FL SEWAGE AG","layerCodes":["FL SEWAGE AG"],"category":"Utility","description":""},{"id":93,"code":642,"name":"FLOWLINE, ABOVE GROUND LEVEL, UNDEFINED","layerCode":"FL UN AG","layerCodes":["FL UN AG"],"category":"Utility","description":""},{"id":94,"code":633,"name":"FLOWLINE, BURIED, DISUSED/REDUNDANT","layerCode":"FL DISUSED UG","layerCodes":["FL DISUSED UG"],"category":"Utility","description":""},{"id":95,"code":634,"name":"FLOWLINE, BURIED, FIRE WATER","layerCode":"FL FIRE UG","layerCodes":["FL FIRE UG"],"category":"Utility","description":""},{"id":96,"code":628,"name":"FLOWLINE, BURIED, GAS","layerCode":"FL GAS UG","layerCodes":["FL GAS UG"],"category":"Utility","description":""},{"id":97,"code":627,"name":"FLOWLINE, BURIED, OIL","layerCode":"FL OIL UG","layerCodes":["FL OIL UG"],"category":"Utility","description":""},{"id":98,"code":629,"name":"FLOWLINE, BURIED, POTABLE WATER","layerCode":"FL POT UG","layerCodes":["FL POT UG"],"category":"Utility","description":""},{"id":99,"code":630,"name":"FLOWLINE, BURIED, SALT WATER","layerCode":"FL SALT WATER UG","layerCodes":["FL SALT WATER UG"],"category":"Utility","description":""},{"id":100,"code":631,"name":"FLOWLINE, BURIED, SEWAGE WATER","layerCode":"FL SEWAGE UG","layerCodes":["FL SEWAGE UG"],"category":"Utility","description":""},{"id":101,"code":632,"name":"FLOWLINE, BURIED, UNDEFINED","layerCode":"FL DISUSED SR","layerCodes":["FL DISUSED SR"],"category":"Utility","description":""},{"id":102,"code":622,"name":"FLOWLINE, SURFACE, GAS","layerCode":"FL GAS UG","layerCodes":["FL GAS UG"],"category":"Utility","description":""},{"id":103,"code":621,"name":"FLOWLINE, SURFACE, OIL","layerCode":"FL OIL UG","layerCodes":["FL OIL UG"],"category":"Utility","description":""},{"id":104,"code":623,"name":"FLOWLINE, SURFACE, POTABLE WATER","layerCode":"FL POT UG","layerCodes":["FL POT UG"],"category":"Utility","description":""},{"id":105,"code":624,"name":"FLOWLINE, SURFACE, SALT WATER","layerCode":"FL SALT WATER UG","layerCodes":["FL SALT WATER UG"],"category":"Utility","description":""},{"id":106,"code":625,"name":"FLOWLINE, SURFACE, SEWAGE WATER","layerCode":"FL SEWAGE UG","layerCodes":["FL SEWAGE UG"],"category":"Utility","description":""},{"id":107,"code":556,"name":"FOUNTAIN","layerCode":"FOUNTAIN","layerCodes":["FOUNTAIN"],"category":"General","description":""},{"id":108,"code":87,"name":"GABION, EDGE OF","layerCode":"EDGE OF","layerCodes":["EDGE OF"],"category":"General","description":""},{"id":109,"code":57,"name":"GATE","layerCode":"GATE","layerCodes":["GATE"],"category":"Structure","description":""},{"id":110,"code":117,"name":"GAUGE, PRESSURE","layerCode":"PRESSURE GAUGE","layerCodes":["PRESSURE GAUGE"],"category":"General","description":""},{"id":111,"code":376,"name":"GULLY","layerCode":"GULLY","layerCodes":["GULLY"],"category":"Drainage","description":""},{"id":112,"code":18,"name":"HEDGE","layerCode":"HEDGE","layerCodes":["HEDGE"],"category":"Vegetation","description":""},{"id":113,"code":76,"name":"HOLE, BORE","layerCode":"BH","layerCodes":["BH"],"category":"General","description":""},{"id":114,"code":225,"name":"HYDRANT, FIRE","layerCode":"FH","layerCodes":["FH"],"category":"Utility","description":""},{"id":115,"code":95,"name":"JEBEL, BOTTOM","layerCode":"JABAL BOT","layerCodes":["JABAL BOT"],"category":"General","description":""},{"id":116,"code":94,"name":"JEBEL, TOP","layerCode":"JABAL TOP","layerCodes":["JABAL TOP"],"category":"General","description":""},{"id":117,"code":19,"name":"KERB","layerCode":"KERB","layerCodes":["KERB"],"category":"Road","description":""},{"id":118,"code":128,"name":"LEVEL, FINISHED FLOOR (FFL)","layerCode":"FFL","layerCodes":["FFL"],"category":"Structure","description":""},{"id":119,"code":325,"name":"LIGHT, LOW LEVEL/GARDEN/FOUNTAIN/TRAFFIC (SIGNAL)","layerCode":"TRAFIC SIGNAL","layerCodes":["TRAFIC SIGNAL"],"category":"Vegetation","description":""},{"id":120,"code":20,"name":"LINE, COAST/HIGH WATER","layerCode":"WL HIGH","layerCodes":["WL HIGH"],"category":"Utility","description":""},{"id":121,"code":58,"name":"LINE, LOW WATER (LWL)","layerCode":"WL LOW","layerCodes":["WL LOW"],"category":"Utility","description":""},{"id":122,"code":96,"name":"LINE, ROOF","layerCode":"ROOF","layerCodes":["ROOF"],"category":"Structure","description":""},{"id":123,"code":175,"name":"MANHOLE, (UNKNOWN)","layerCode":"MH","layerCodes":["MH"],"category":"Utility","description":""},{"id":124,"code":576,"name":"MANHOLE, CATHODIC PROTECTION","layerCode":"CP MH","layerCodes":["CP MH"],"category":"Utility","description":""},{"id":125,"code":275,"name":"MANHOLE, ELECTRICITY","layerCode":"ELEC MH","layerCodes":["ELEC MH"],"category":"Utility","description":""},{"id":126,"code":475,"name":"MANHOLE, SEWER","layerCode":"SW MH","layerCodes":["SW MH"],"category":"Utility","description":""},{"id":127,"code":575,"name":"MANHOLE, TELEPHONE","layerCode":"TEL MH","layerCodes":["TEL MH"],"category":"Utility","description":""},{"id":128,"code":375,"name":"MANHOLE, WATER","layerCode":"WATER MH","layerCodes":["WATER MH"],"category":"Utility","description":""},{"id":129,"code":82,"name":"MANIFOLD","layerCode":"MANIFOLD","layerCodes":["MANIFOLD"],"category":"General","description":""},{"id":130,"code":85,"name":"MARK, BENCH","layerCode":"BENCH MARK","layerCodes":["BENCH MARK"],"category":"General","description":""},{"id":131,"code":365,"name":"MARKER POST UNDEFINED/STANDARD","layerCode":"MP","layerCodes":["MP"],"category":"Structure","description":""},{"id":132,"code":255,"name":"MARKER, BOUNDARY","layerCode":"MB","layerCodes":["MB"],"category":"Survey Control","description":""},{"id":133,"code":370,"name":"MARKER, CABLE, BURIED, ELECTRIC, HT","layerCode":"MARKER CABL HT UG","layerCodes":["MARKER CABL HT UG"],"category":"Utility","description":""},{"id":134,"code":371,"name":"MARKER, CABLE, BURIED, ELECTRIC, LT","layerCode":"MARKER CABL LT UG","layerCodes":["MARKER CABL LT UG"],"category":"Utility","description":""},{"id":135,"code":372,"name":"MARKER, CABLE, BURIED, TELEPHONE","layerCode":"MARKER CABLE TEL C UG","layerCodes":["MARKER CABLE TEL C UG"],"category":"Utility","description":""},{"id":136,"code":367,"name":"MARKER, PIPELINE, BURIED, GAS","layerCode":"MARKER GAS PIPELINE UG","layerCodes":["MARKER GAS PIPELINE UG"],"category":"Utility","description":""},{"id":137,"code":366,"name":"MARKER, PIPELINE, BURIED, OIL","layerCode":"MARKER OIL PL UG","layerCodes":["MARKER OIL PL UG"],"category":"Utility","description":""},{"id":138,"code":368,"name":"MARKER, PIPELINE, BURIED, WATER","layerCode":"MARKER WATER PL UG","layerCodes":["MARKER WATER PL UG"],"category":"Utility","description":""},{"id":139,"code":335,"name":"MARKER, RIGHT OF WAY","layerCode":"MARKER ROH","layerCodes":["MARKER ROH"],"category":"General","description":""},{"id":140,"code":363,"name":"MARKER, XING, PIPELINE","layerCode":"MARKER PIPELINE","layerCodes":["MARKER PIPELINE"],"category":"Utility","description":""},{"id":141,"code":362,"name":"MARKER, XING, ROAD","layerCode":"MARKER ROAD","layerCodes":["MARKER ROAD"],"category":"Road","description":""},{"id":142,"code":361,"name":"MARKER, XING, WADI","layerCode":"MARKER WADI","layerCodes":["MARKER WADI"],"category":"Drainage","description":""},{"id":143,"code":345,"name":"METER","layerCode":"METER","layerCodes":["METER"],"category":"Utility","description":""},{"id":144,"code":183,"name":"MONUMENT","layerCode":"MONUMENT","layerCodes":["MONUMENT"],"category":"Survey Control","description":""},{"id":145,"code":39,"name":"OUTCROP, ROCK","layerCode":"OUT CORP","layerCodes":["OUT CORP"],"category":"General","description":""},{"id":146,"code":178,"name":"PANEL, SOLAR","layerCode":"SOLAR","layerCodes":["SOLAR"],"category":"General","description":""},{"id":147,"code":102,"name":"PARK, CAR","layerCode":"PARKING","layerCodes":["PARKING"],"category":"General","description":""},{"id":148,"code":17,"name":"PATH, FOOT","layerCode":"FOOTPATH","layerCodes":["FOOTPATH"],"category":"General","description":""},{"id":149,"code":16,"name":"PATH, GRAVEL","layerCode":"GRAVEL PATH","layerCodes":["GRAVEL PATH"],"category":"General","description":""},{"id":150,"code":14,"name":"PATH, PAVED","layerCode":"PAVED PATH","layerCodes":["PAVED PATH"],"category":"General","description":""},{"id":151,"code":440,"name":"PILLAR","layerCode":"PILLAR","layerCodes":["PILLAR"],"category":"General","description":""},{"id":152,"code":608,"name":"PIPELINE, MAJOR, BURIED, DISUSED/REDUNDANT","layerCode":"PL DISUSED UG","layerCodes":["PL DISUSED UG"],"category":"Utility","description":""},{"id":153,"code":602,"name":"PIPELINE, MAJOR, BURIED, GAS","layerCode":"PL GAS UG","layerCodes":["PL GAS UG"],"category":"Utility","description":""},{"id":154,"code":601,"name":"PIPELINE, MAJOR, BURIED, OIL","layerCode":"PL OIL UG","layerCodes":["PL OIL UG"],"category":"Utility","description":""},{"id":155,"code":603,"name":"PIPELINE, MAJOR, BURIED, POTABLE WATER","layerCode":"PL POTABLE WATER UG","layerCodes":["PL POTABLE WATER UG"],"category":"Utility","description":""},{"id":156,"code":604,"name":"PIPELINE, MAJOR, BURIED, SALT WATER","layerCode":"PL SALT WATER UG","layerCodes":["PL SALT WATER UG"],"category":"Utility","description":""},{"id":157,"code":605,"name":"PIPELINE, MAJOR, BURIED, SEWAGE WATER","layerCode":"PL SEWAGE WATER UG","layerCodes":["PL SEWAGE WATER UG"],"category":"Utility","description":""},{"id":158,"code":607,"name":"PIPELINE, MAJOR, BURIED, UNDEFINED","layerCode":"PL UNDEFINED","layerCodes":["PL UNDEFINED"],"category":"Utility","description":""},{"id":159,"code":618,"name":"PIPELINE, MAJOR, SURFACE, DISUSED/REDUNDANT","layerCode":"PL DISUSED SURF","layerCodes":["PL DISUSED SURF"],"category":"Utility","description":""},{"id":160,"code":612,"name":"PIPELINE, MAJOR, SURFACE, GAS","layerCode":"PL GAS SURF","layerCodes":["PL GAS SURF"],"category":"Utility","description":""},{"id":161,"code":611,"name":"PIPELINE, MAJOR, SURFACE, OIL","layerCode":"PL OIL SURF","layerCodes":["PL OIL SURF"],"category":"Utility","description":""},{"id":162,"code":613,"name":"PIPELINE, MAJOR, SURFACE, POTABLE WATER","layerCode":"PL POTABLE WATER SURF","layerCodes":["PL POTABLE WATER SURF"],"category":"Utility","description":""},{"id":163,"code":614,"name":"PIPELINE, MAJOR, SURFACE, SALT WATER","layerCode":"PL SALT WATER SURF","layerCodes":["PL SALT WATER SURF"],"category":"Utility","description":""},{"id":164,"code":615,"name":"PIPELINE, MAJOR, SURFACE, SEWAGE WATER","layerCode":"PL SEWAGE WATER SURF","layerCodes":["PL SEWAGE WATER SURF"],"category":"Utility","description":""},{"id":165,"code":617,"name":"PIPELINE, MAJOR, SURFACE, UNDEFINED","layerCode":"PL UNDEFINED","layerCodes":["PL UNDEFINED"],"category":"Utility","description":""},{"id":166,"code":65,"name":"PIT, BORROW","layerCode":"PIT","layerCodes":["PIT"],"category":"General","description":""},{"id":167,"code":188,"name":"PIT, FIRE HYDRANT","layerCode":"FH PIT","layerCodes":["FH PIT"],"category":"Utility","description":""},{"id":168,"code":190,"name":"PIT, MAGNET","layerCode":"MAGNET PIT","layerCodes":["MAGNET PIT"],"category":"General","description":""},{"id":169,"code":191,"name":"PIT, VALVE","layerCode":"VALVE PIT","layerCodes":["VALVE PIT"],"category":"Utility","description":""},{"id":170,"code":192,"name":"PIT, VALVE AND HYDRANT","layerCode":"HYD VALVE PIT","layerCodes":["HYD VALVE PIT"],"category":"Utility","description":""},{"id":171,"code":61,"name":"PITCH, FOOTBALL","layerCode":"PITCH","layerCodes":["PITCH"],"category":"General","description":""},{"id":172,"code":174,"name":"POINT, EARTHING PROTECTION","layerCode":"ERP","layerCodes":["ERP"],"category":"Utility","description":""},{"id":173,"code":226,"name":"POINT, FIRE","layerCode":"FIRE POINT","layerCodes":["FIRE POINT"],"category":"General","description":""},{"id":174,"code":565,"name":"POINT, INJECTION","layerCode":"INJECTION POINT","layerCodes":["INJECTION POINT"],"category":"General","description":""},{"id":175,"code":215,"name":"POLE, ELECTRICITY","layerCode":"POLE","layerCodes":["POLE"],"category":"Utility","description":""},{"id":176,"code":155,"name":"POLE, FENCE","layerCode":"FENCE/POLE","layerCodes":["FENCE/POLE"],"category":"Structure","description":""},{"id":177,"code":115,"name":"POLE, TELEPHONE","layerCode":"TEL POLE","layerCodes":["TEL POLE"],"category":"Utility","description":""},{"id":178,"code":338,"name":"POST, BARRIER","layerCode":"BP","layerCodes":["BP"],"category":"Structure","description":""},{"id":179,"code":153,"name":"POST, FLAG","layerCode":"FP","layerCodes":["FP"],"category":"Structure","description":""},{"id":180,"code":315,"name":"POST, LAMP","layerCode":"LP","layerCodes":["LP"],"category":"Structure","description":""},{"id":181,"code":374,"name":"POST, MOORING","layerCode":"MOORING","layerCodes":["MOORING"],"category":"Structure","description":""},{"id":182,"code":184,"name":"POST, PIPE","layerCode":"PP","layerCodes":["PP"],"category":"Utility","description":""},{"id":183,"code":185,"name":"POST, SIGN","layerCode":"SP","layerCodes":["SP"],"category":"Structure","description":""},{"id":184,"code":154,"name":"PYLON","layerCode":"PYLON","layerCodes":["PYLON"],"category":"Utility","description":""},{"id":185,"code":93,"name":"QUAY, EDGE OF/JETTY","layerCode":"QUAY","layerCodes":["QUAY"],"category":"General","description":""},{"id":186,"code":104,"name":"RACK, OF PIPELINE","layerCode":"PL RACK","layerCodes":["PL RACK"],"category":"Utility","description":""},{"id":187,"code":60,"name":"RAIL, GUARD","layerCode":"RAIL GUARD","layerCodes":["RAIL GUARD"],"category":"General","description":""},{"id":188,"code":15,"name":"RAMP","layerCode":"RAMP","layerCodes":["RAMP"],"category":"General","description":""},{"id":189,"code":161,"name":"RECTIFIER","layerCode":"RECTIFIER","layerCodes":["RECTIFIER"],"category":"General","description":""},{"id":190,"code":358,"name":"REFLECTOR","layerCode":"REFLECTOR","layerCodes":["REFLECTOR"],"category":"General","description":""},{"id":191,"code":29,"name":"RIDGE","layerCode":"RIDGE","layerCodes":["RIDGE"],"category":"General","description":""},{"id":192,"code":64,"name":"RIGHT OF WAY, PIPELINE etc.","layerCode":"PL ROW","layerCodes":["PL ROW"],"category":"Utility","description":""},{"id":193,"code":100,"name":"RIP-RAP","layerCode":"RIP RAP","layerCodes":["RIP RAP"],"category":"General","description":""},{"id":194,"code":11,"name":"ROAD, CONCRETE","layerCode":"CONCRETE ROAD","layerCodes":["CONCRETE ROAD"],"category":"Road","description":""},{"id":195,"code":12,"name":"ROAD, GRADED","layerCode":"GRADED ROAD","layerCodes":["GRADED ROAD"],"category":"Road","description":""},{"id":196,"code":62,"name":"ROAD, INSPECTION RIGHT-OF-WAY","layerCode":"INSPECTION ROW","layerCodes":["INSPECTION ROW"],"category":"Road","description":""},{"id":197,"code":10,"name":"ROAD, TARMAC/ASPHALT","layerCode":"ASPHALT ROAD","layerCodes":["ASPHALT ROAD"],"category":"Road","description":""},{"id":198,"code":63,"name":"ROUTE, PIPELINE, CENTRELINE OF","layerCode":"PL ROUTE","layerCodes":["PL ROUTE"],"category":"Utility","description":""},{"id":199,"code":74,"name":"ROUTE, ROAD, CENTRELINE OF","layerCode":"ROAD CENTERLINE","layerCodes":["ROAD CENTERLINE"],"category":"Road","description":""},{"id":200,"code":38,"name":"SAND DUNE","layerCode":"SAND DUNE","layerCodes":["SAND DUNE"],"category":"General","description":""},{"id":201,"code":285,"name":"SIGN, ROAD","layerCode":"ROAD SIGN","layerCodes":["ROAD SIGN"],"category":"Structure","description":""},{"id":202,"code":125,"name":"SPOT HEIGHT/BREAKLINES NOT OTHERWISE CODED","layerCode":"SPOT HEIGHT","layerCodes":["SPOT HEIGHT"],"category":"General","description":""},{"id":203,"code":665,"name":"STAKE, PI/AP","layerCode":"STAKE","layerCodes":["STAKE"],"category":"General","description":""},{"id":204,"code":84,"name":"STATION, TRIG/CONTROL","layerCode":"CONTROL STATION","layerCodes":["CONTROL STATION"],"category":"Survey Control","description":""},{"id":205,"code":101,"name":"STEP","layerCode":"STEP","layerCodes":["STEP"],"category":"General","description":""},{"id":206,"code":650,"name":"TANK, FUEL","layerCode":"TANK","layerCodes":["TANK"],"category":"Structure","description":""},{"id":207,"code":645,"name":"TANK, SEPTIC","layerCode":"TANK SEPTIC","layerCodes":["TANK SEPTIC"],"category":"Structure","description":""},{"id":208,"code":43,"name":"TANK, UNDEFINED","layerCode":"TANK UND.","layerCodes":["TANK UND."],"category":"Structure","description":""},{"id":209,"code":445,"name":"TANK, WATER","layerCode":"TANK WATER","layerCodes":["TANK WATER"],"category":"Utility","description":""},{"id":210,"code":98,"name":"TEMPORARY STRUCTURE/HUT/SHED","layerCode":"SHED","layerCodes":["SHED"],"category":"Structure","description":""},{"id":211,"code":145,"name":"TOILET","layerCode":"TOILET","layerCodes":["TOILET"],"category":"Utility","description":""},{"id":212,"code":160,"name":"TOWER, MICROWAVE","layerCode":"TOWER","layerCodes":["TOWER"],"category":"Structure","description":""},{"id":213,"code":13,"name":"TRACK","layerCode":"TRACK ROAD","layerCodes":["TRACK ROAD"],"category":"General","description":""},{"id":214,"code":151,"name":"TRANSFORMER","layerCode":"TRANSFORMER","layerCodes":["TRANSFORMER"],"category":"Utility","description":""},{"id":215,"code":235,"name":"TREE OR SHRUB","layerCode":"SHRUB","layerCodes":["SHRUB"],"category":"Vegetation","description":""},{"id":216,"code":135,"name":"TREE, PALM","layerCode":"TREE","layerCodes":["TREE"],"category":"Vegetation","description":""},{"id":217,"code":31,"name":"TREES/SHRUB LINE OF","layerCode":"TREE LINE","layerCodes":["TREE LINE"],"category":"Vegetation","description":""},{"id":218,"code":590,"name":"TRENCH, COVERED","layerCode":"TRENCH COVERED","layerCodes":["TRENCH COVERED"],"category":"General","description":""},{"id":219,"code":591,"name":"TRENCH, OPEN","layerCode":"TRENCH OPEN","layerCodes":["TRENCH OPEN"],"category":"General","description":""},{"id":220,"code":265,"name":"VALVE, BLOCK","layerCode":"BLOCK VALVE","layerCodes":["BLOCK VALVE"],"category":"Utility","description":""},{"id":221,"code":355,"name":"VALVE, GAS","layerCode":"GAS VALVE","layerCodes":["GAS VALVE"],"category":"Utility","description":""},{"id":222,"code":336,"name":"VALVE, IRRIGATION","layerCode":"IRRIGATION VALVE","layerCodes":["IRRIGATION VALVE"],"category":"Utility","description":""},{"id":223,"code":557,"name":"VENT, PIPE","layerCode":"PIPE","layerCodes":["PIPE"],"category":"Utility","description":""},{"id":224,"code":21,"name":"WADI CENTRE LINE","layerCode":"WADI CENTERLINE","layerCodes":["WADI CENTERLINE"],"category":"Drainage","description":""},{"id":225,"code":22,"name":"WADI EDGE OF","layerCode":"WADI","layerCodes":["WADI"],"category":"Drainage","description":""},{"id":226,"code":54,"name":"WALL","layerCode":"WALL","layerCodes":["WALL"],"category":"Structure","description":""},{"id":227,"code":83,"name":"WELL CELLAR/HEAD","layerCode":"WELL","layerCodes":["WELL"],"category":"General","description":""},{"id":228,"code":44,"name":"WELL SITE  LOCATION/PLATFORM","layerCode":"WELL SITE/ WELL PAD/PAD","layerCodes":["WELL SITE/ WELL PAD/PAD"],"category":"Structure","description":""},{"id":229,"code":163,"name":"WELL, EARTHING POINT","layerCode":"EARTHING PIT","layerCodes":["EARTHING PIT"],"category":"Utility","description":""},{"id":230,"code":558,"name":"WIND SOCK","layerCode":"WIND SHOCK","layerCodes":["WIND SHOCK"],"category":"General","description":""},{"id":231,"code":72,"name":"WINDROW, PIPELINE","layerCode":"PL WINDROW","layerCodes":["PL WINDROW"],"category":"Utility","description":""},{"id":232,"code":116,"name":"WIRE, STAY","layerCode":"STAY WIRE","layerCodes":["STAY WIRE"],"category":"General","description":""},{"id":233,"code":99,"name":"YARD, GRAVE","layerCode":"GRAVE YARD","layerCodes":["GRAVE YARD"],"category":"General","description":""}]</script>
+<script>
+(function(){
+  "use strict";
+
+  var MASTER = JSON.parse(document.getElementById('master-data').textContent);
+  var STORAGE_KEY = 'pdo_sd_feature_db_v1';
+  var PAGE_SIZE = 20;
+
+  var state = {
+    dbPage: 1,
+    adminPage: 1,
+    dbSort: {col:'code', dir:1},
+  };
+
+  // ---------- persistence layer ----------
+  function loadOverrides(){
+    try{
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw) return {added:[], edited:{}, deleted:[]};
+      var o = JSON.parse(raw);
+      return {added:o.added||[], edited:o.edited||{}, deleted:o.deleted||[]};
+    }catch(e){ return {added:[], edited:{}, deleted:[]}; }
+  }
+  function saveOverrides(o){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(o));
+  }
+  var overrides = loadOverrides();
+
+  function nextId(){
+    var maxId = 0;
+    MASTER.forEach(function(r){ if(r.id>maxId) maxId=r.id; });
+    overrides.added.forEach(function(r){ if(r.id>maxId) maxId=r.id; });
+    return maxId+1;
+  }
+
+  function getDataset(){
+    var deleted = {};
+    overrides.deleted.forEach(function(id){ deleted[id]=true; });
+    var out = [];
+    MASTER.forEach(function(r){
+      if(deleted[r.id]) return;
+      var edit = overrides.edited[r.id];
+      out.push(edit ? Object.assign({}, r, edit, {_modified:true}) : r);
+    });
+    overrides.added.forEach(function(r){
+      if(!deleted[r.id]) out.push(Object.assign({}, r, {_new:true}));
+    });
+    return out;
+  }
+
+  function normalize(str){
+    return String(str==null?'':str).toUpperCase().replace(/\s+/g,'').trim();
+  }
+  function normalizeLoose(str){
+    return String(str==null?'':str).toUpperCase().trim();
+  }
+
+  // ---------- toast ----------
+  var toastEl = document.getElementById('toast');
+  var toastTimer;
+  function toast(msg){
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ toastEl.classList.remove('show'); }, 2200);
+  }
+  function copyText(text, label){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ toast((label||'Value')+' copied: '+text); });
+    } else {
+      toast('Copy not supported in this browser');
+    }
+  }
+
+  // ---------- highlight ----------
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function highlight(text, needle){
+    text = String(text==null?'':text);
+    if(!needle) return escapeHtml(text);
+    var idx = text.toUpperCase().indexOf(needle.toUpperCase());
+    if(idx===-1) return escapeHtml(text);
+    return escapeHtml(text.slice(0,idx)) + '<mark>' + escapeHtml(text.slice(idx, idx+needle.length)) + '</mark>' + escapeHtml(text.slice(idx+needle.length));
+  }
+
+  // ---------- search core ----------
+  function matchesLayerCode(record, needle){
+    if(!needle) return false;
+    var n = normalize(needle);
+    if(!record.layerCodes || !record.layerCodes.length) return false;
+    // exact token match
+    for(var i=0;i<record.layerCodes.length;i++){
+      if(normalize(record.layerCodes[i]) === n) return true;
+    }
+    // whole combined string exact match e.g. "AS,HEL"
+    if(normalize(record.layerCode) === n) return true;
+    // partial match against any token
+    for(var j=0;j<record.layerCodes.length;j++){
+      if(normalize(record.layerCodes[j]).indexOf(n) !== -1) return true;
+    }
+    return false;
+  }
+  function matchesCode(record, needle){
+    var n = String(needle).replace(/\s+/g,'');
+    if(!n) return false;
+    return String(record.code).indexOf(n) !== -1;
+  }
+  function matchesName(record, needle){
+    if(!needle) return false;
+    return normalizeLoose(record.name).indexOf(normalizeLoose(needle)) !== -1;
+  }
+  function matchesAny(record, needle){
+    return matchesCode(record, needle) || matchesLayerCode(record, needle) || matchesName(record, needle);
+  }
+
+  // ---------- view switching ----------
+  var VIEW_META = {
+    dashboard: {eyebrow:'DASHBOARD', title:'Detail Feature Code Database', sub:'Master reference for CAD / GIS survey layer coding'},
+    codesearch: {eyebrow:'CODE SEARCH', title:'Search by Code Number', sub:'Look up layer name and layer code from a feature code'},
+    layerlookup: {eyebrow:'LAYER CODE LOOKUP', title:'Search by Layer Code / Layer Name', sub:'Look up feature code from a CAD/GIS layer code or name'},
+    database: {eyebrow:'FEATURE DATABASE', title:'Full Feature Code Table', sub:'Browse, sort and export the complete dataset'},
+    datamanagement: {eyebrow:'DATA MANAGEMENT', title:'Import, Edit & Export', sub:'Administer the working copy of the feature code database'}
+  };
+
+  function setView(name){
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+    document.getElementById('view-'+name).classList.add('active');
+    document.querySelectorAll('nav.mainnav button').forEach(function(b){
+      b.classList.toggle('active', b.dataset.view===name);
+    });
+    var m = VIEW_META[name];
+    document.getElementById('viewEyebrow').textContent = m.eyebrow;
+    document.getElementById('viewTitle').textContent = m.title;
+    document.getElementById('viewSub').textContent = m.sub;
+    document.getElementById('sidebar').classList.remove('open');
+    if(name==='database') renderDbTable();
+    if(name==='datamanagement') renderAdminTable();
+  }
+  document.querySelectorAll('nav.mainnav button').forEach(function(b){
+    b.addEventListener('click', function(){ setView(b.dataset.view); });
+  });
+  document.getElementById('menuBtn').addEventListener('click', function(){
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+
+  // ---------- stats + header ----------
+  function refreshStats(){
+    var data = getDataset();
+    var names = new Set(data.map(function(r){return normalizeLoose(r.name);}));
+    var lcs = new Set();
+    data.forEach(function(r){ (r.layerCodes||[]).forEach(function(c){ lcs.add(normalize(c)); }); });
+    var cats = new Set(data.map(function(r){ return r.category||'General'; }));
+    document.getElementById('statCodes').textContent = data.length;
+    document.getElementById('statNames').textContent = names.size;
+    document.getElementById('statLayerCodes').textContent = lcs.size;
+    document.getElementById('statCategories').textContent = cats.size;
+    document.getElementById('metaRecords').textContent = data.length;
+    var modCount = Object.keys(overrides.edited).length + overrides.added.length + overrides.deleted.length;
+    document.getElementById('metaStatus').textContent = modCount>0 ? (modCount+' local change'+(modCount===1?'':'s')) : 'Master data';
+
+    // category breakdown
+    var counts = {};
+    data.forEach(function(r){
+      var c = r.category || 'General';
+      counts[c] = (counts[c]||0)+1;
+    });
+    var maxCount = Math.max.apply(null, Object.values(counts).concat([1]));
+    var html = '';
+    Object.keys(counts).sort(function(a,b){return counts[b]-counts[a];}).forEach(function(cat){
+      var pct = Math.round(counts[cat]/maxCount*100);
+      html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:9px;">' +
+        '<div style="width:120px;font-size:12px;flex-shrink:0;">'+escapeHtml(cat)+'</div>' +
+        '<div style="flex:1;background:#EFF1EA;height:14px;position:relative;">' +
+        '<div style="width:'+pct+'%;background:var(--confirm);height:100%;"></div></div>' +
+        '<div style="width:34px;text-align:right;font-family:var(--mono);font-size:12px;color:var(--ink-faint);flex-shrink:0;">'+counts[cat]+'</div>' +
+        '</div>';
+    });
+    document.getElementById('categoryBreakdown').innerHTML = html;
+
+    // populate category filter
+    var sel = document.getElementById('dbCategoryFilter');
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">All categories</option>' + Array.from(cats).sort().map(function(c){
+      return '<option value="'+escapeHtml(c)+'">'+escapeHtml(c)+'</option>';
+    }).join('');
+    sel.value = cur;
+  }
+
+  // ---------- result table renderer (used by dashboard global search) ----------
+  function buildResultsTable(records, needle, opts){
+    opts = opts || {};
+    if(!records.length){
+      return '<div class="empty-state"><span class="big">∅</span>No matching feature codes found'+(needle?' for "'+escapeHtml(needle)+'"':'')+'.</div>';
+    }
+    var rows = records.map(function(r){
+      return '<tr data-id="'+r.id+'">'+
+        '<td class="code">'+highlight(r.code, needle)+'</td>'+
+        '<td>'+highlight(r.name, needle)+(r._new?'<span class="badge-new">NEW</span>':'')+(r._modified?'<span class="badge-modified">EDITED</span>':'')+'</td>'+
+        '<td class="lcode">'+highlight(r.layerCode||'—', needle)+'</td>'+
+        '<td><span class="catpill">'+escapeHtml(r.category||'General')+'</span></td>'+
+        '<td><button class="copybtn" data-copy="code" data-id="'+r.id+'">Copy code</button> <button class="copybtn" data-copy="layer" data-id="'+r.id+'">Copy layer</button></td>'+
+      '</tr>';
+    }).join('');
+    return '<table class="datatable"><thead><tr>'+
+      '<th>Code No.</th><th>Layer Name</th><th>Layer Code</th><th>Category</th><th></th>'+
+      '</tr></thead><tbody>'+rows+'</tbody></table>';
+  }
+
+  function wireResultRows(container, records){
+    container.querySelectorAll('tbody tr').forEach(function(tr){
+      tr.addEventListener('click', function(e){
+        if(e.target.closest('button')) return;
+        var id = parseInt(tr.dataset.id,10);
+        var rec = records.find(function(r){return r.id===id;});
+        if(rec) openDetail(rec);
+      });
+    });
+    container.querySelectorAll('button[data-copy]').forEach(function(btn){
+      btn.addEventListener('click', function(e){
+        e.stopPropagation();
+        var id = parseInt(btn.dataset.id,10);
+        var rec = records.find(function(r){return r.id===id;});
+        if(!rec) return;
+        if(btn.dataset.copy==='code') copyText(String(rec.code), 'Code No.');
+        else copyText(rec.layerCode||'', 'Layer Code');
+      });
+    });
+  }
+
+  // ---------- dashboard global search ----------
+  var globalInput = document.getElementById('globalSearchInput');
+  function runGlobalSearch(){
+    var q = globalInput.value.trim();
+    var panel = document.getElementById('dashResultsPanel');
+    var wrap = document.getElementById('dashTableWrap');
+    if(!q){ panel.style.display='none'; return; }
+    var data = getDataset().filter(function(r){ return matchesAny(r, q); });
+    panel.style.display='';
+    document.getElementById('dashRowCount').textContent = data.length + ' match' + (data.length===1?'':'es');
+    wrap.innerHTML = buildResultsTable(data, q);
+    wireResultRows(wrap, data);
+  }
+  globalInput.addEventListener('input', runGlobalSearch);
+  document.getElementById('globalClearBtn').addEventListener('click', function(){
+    globalInput.value=''; runGlobalSearch(); globalInput.focus();
+  });
+
+  // ---------- code search view ----------
+  var codeInput = document.getElementById('codeSearchInput');
+  function runCodeSearch(){
+    var q = codeInput.value.trim();
+    var el = document.getElementById('codeSearchResults');
+    if(!q){ el.innerHTML = '<div class="empty-state"><span class="big">#</span>Enter a code number to look up its layer name and layer code.</div>'; return; }
+    var data = getDataset().filter(function(r){ return matchesCode(r,q); })
+      .sort(function(a,b){ return String(a.code).indexOf(q)-String(b.code).indexOf(q) || a.code-b.code; });
+    if(!data.length){ el.innerHTML = '<div class="empty-state"><span class="big">∅</span>No feature code matches "'+escapeHtml(q)+'".</div>'; return; }
+    el.innerHTML = data.map(function(r){ return resultCardHtml(r,q); }).join('');
+    wireResultCards(el, data);
+  }
+  codeInput.addEventListener('input', runCodeSearch);
+
+  function resultCardHtml(r, q){
+    return '<div class="lookup-result-card" data-id="'+r.id+'">'+
+      '<div class="code-badge">'+highlight(r.code,q)+'</div>'+
+      '<div class="lname">'+highlight(r.name,q)+(r._new?'<span class="badge-new">NEW</span>':'')+(r._modified?'<span class="badge-modified">EDITED</span>':'')+'</div>'+
+      '<div class="meta">Layer Code: <code>'+highlight(r.layerCode||'—',q)+'</code> &nbsp;·&nbsp; <span class="catpill">'+escapeHtml(r.category||'General')+'</span></div>'+
+      '<div style="margin-top:10px;"><button class="copybtn" data-copy="code" data-id="'+r.id+'">Copy Code No.</button> '+
+      '<button class="copybtn" data-copy="layer" data-id="'+r.id+'">Copy Layer Code</button> '+
+      '<button class="copybtn" data-view-detail data-id="'+r.id+'">View details →</button></div>'+
+    '</div>';
+  }
+  function wireResultCards(container, records){
+    container.querySelectorAll('button[data-copy]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = parseInt(btn.dataset.id,10);
+        var rec = records.find(function(r){return r.id===id;});
+        if(!rec) return;
+        if(btn.dataset.copy==='code') copyText(String(rec.code),'Code No.');
+        else copyText(rec.layerCode||'','Layer Code');
+      });
+    });
+    container.querySelectorAll('button[data-view-detail]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var id = parseInt(btn.dataset.id,10);
+        var rec = records.find(function(r){return r.id===id;});
+        if(rec) openDetail(rec);
+      });
+    });
+  }
+
+  // ---------- layer code lookup view ----------
+  var layerInput = document.getElementById('layerSearchInput');
+  function runLayerSearch(){
+    var q = layerInput.value.trim();
+    var el = document.getElementById('layerSearchResults');
+    if(!q){ el.innerHTML = '<div class="empty-state"><span class="big">§</span>Enter a layer code to find its feature and code number.</div>'; return; }
+    var data = getDataset().filter(function(r){ return matchesLayerCode(r,q); });
+    if(!data.length){ el.innerHTML = '<div class="empty-state"><span class="big">∅</span>No layer code matches "'+escapeHtml(q)+'".</div>'; return; }
+    var note = data.length>1 ? '<div class="meta" style="margin-bottom:8px;">Multiple records share this layer code — showing all matches.</div>' : '';
+    el.innerHTML = note + data.map(function(r){ return resultCardHtml(r,q); }).join('');
+    wireResultCards(el, data);
+  }
+  layerInput.addEventListener('input', runLayerSearch);
+
+  var nameInput = document.getElementById('nameSearchInput');
+  function runNameSearch(){
+    var q = nameInput.value.trim();
+    var el = document.getElementById('nameSearchResults');
+    if(!q){ el.innerHTML = '<div class="empty-state"><span class="big">A–Z</span>Enter part of a feature/layer name.</div>'; return; }
+    var data = getDataset().filter(function(r){ return matchesName(r,q); }).sort(function(a,b){ return a.name.localeCompare(b.name); });
+    if(!data.length){ el.innerHTML = '<div class="empty-state"><span class="big">∅</span>No layer name matches "'+escapeHtml(q)+'".</div>'; return; }
+    el.innerHTML = '<div class="meta" style="margin-bottom:8px;">'+data.length+' match'+(data.length===1?'':'es')+'</div>' + data.map(function(r){ return resultCardHtml(r,q); }).join('');
+    wireResultCards(el, data);
+  }
+  nameInput.addEventListener('input', runNameSearch);
+
+  // ---------- detail panel ----------
+  var overlay = document.getElementById('overlay');
+  var detailPanel = document.getElementById('detailPanel');
+  var currentDetail = null;
+  function openDetail(rec){
+    currentDetail = rec;
+    document.getElementById('dpName').textContent = rec.name;
+    var related = (rec.layerCodes||[]).length>1 ? rec.layerCodes : null;
+    var html = '';
+    html += '<div class="dfield"><span class="k">Code Number</span><span class="v mono">'+escapeHtml(rec.code)+'</span></div>';
+    html += '<div class="dfield"><span class="k">Layer Name</span><span class="v">'+escapeHtml(rec.name)+'</span></div>';
+    html += '<div class="dfield"><span class="k">Layer Code</span><span class="v mono">'+escapeHtml(rec.layerCode||'—')+'</span></div>';
+    html += '<div class="dfield"><span class="k">Category</span><span class="v"><span class="catpill">'+escapeHtml(rec.category||'General')+'</span></span></div>';
+    html += '<div class="dfield"><span class="k">Description</span><span class="v">'+escapeHtml(rec.description||'No description on file.')+'</span></div>';
+    if(related){
+      html += '<div class="dfield"><span class="k">Related / Alternative Layer Codes</span><div class="chips">'+
+        related.map(function(c){return '<span class="chip">'+escapeHtml(c)+'</span>';}).join('')+'</div></div>';
+    }
+    if(rec._new) html += '<div class="dfield"><span class="k">Source</span><span class="v">Added locally (not in master file)</span></div>';
+    if(rec._modified) html += '<div class="dfield"><span class="k">Source</span><span class="v">Edited locally from master value</span></div>';
+    document.getElementById('dpBody').innerHTML = html;
+    overlay.classList.add('show');
+    detailPanel.classList.add('show');
+  }
+  function closeDetail(){
+    overlay.classList.remove('show');
+    detailPanel.classList.remove('show');
+    currentDetail = null;
+  }
+  document.getElementById('dpClose').addEventListener('click', closeDetail);
+  overlay.addEventListener('click', closeDetail);
+  document.getElementById('dpCopyCode').addEventListener('click', function(){
+    if(currentDetail) copyText(String(currentDetail.code),'Code No.');
+  });
+  document.getElementById('dpCopyLayer').addEventListener('click', function(){
+    if(currentDetail) copyText(currentDetail.layerCode||'','Layer Code');
+  });
+
+  // ---------- feature database (full table, sortable, paginated) ----------
+  function getDbFiltered(){
+    var q = document.getElementById('dbFilterInput').value.trim();
+    var cat = document.getElementById('dbCategoryFilter').value;
+    var data = getDataset();
+    if(q) data = data.filter(function(r){ return matchesAny(r,q); });
+    if(cat) data = data.filter(function(r){ return (r.category||'General')===cat; });
+    var col = state.dbSort.col, dir = state.dbSort.dir;
+    data.sort(function(a,b){
+      var av = a[col], bv = b[col];
+      if(col==='code'){ return (av-bv)*dir; }
+      av = String(av||'').toUpperCase(); bv = String(bv||'').toUpperCase();
+      return av<bv ? -1*dir : av>bv ? 1*dir : 0;
+    });
+    return {data:data, q:q};
+  }
+  function renderDbTable(){
+    var res = getDbFiltered();
+    var data = res.data, q = res.q;
+    document.getElementById('dbRowCount').textContent = data.length + ' record'+(data.length===1?'':'s');
+    var totalPages = Math.max(1, Math.ceil(data.length/PAGE_SIZE));
+    if(state.dbPage>totalPages) state.dbPage = totalPages;
+    var start = (state.dbPage-1)*PAGE_SIZE;
+    var pageData = data.slice(start, start+PAGE_SIZE);
+    var wrap = document.getElementById('dbTableWrap');
+    if(!data.length){
+      wrap.innerHTML = '<div class="empty-state"><span class="big">∅</span>No records match this filter.</div>';
+    } else {
+      var arrow = function(col){ return state.dbSort.col===col ? '<span class="arrow">'+(state.dbSort.dir===1?'▲':'▼')+'</span>' : ''; };
+      var rows = pageData.map(function(r){
+        return '<tr data-id="'+r.id+'">'+
+          '<td class="code">'+highlight(r.code,q)+'</td>'+
+          '<td>'+highlight(r.name,q)+(r._new?'<span class="badge-new">NEW</span>':'')+(r._modified?'<span class="badge-modified">EDITED</span>':'')+'</td>'+
+          '<td class="lcode">'+highlight(r.layerCode||'—',q)+'</td>'+
+          '<td><span class="catpill">'+escapeHtml(r.category||'General')+'</span></td>'+
+          '<td>'+escapeHtml(r.description||'—')+'</td>'+
+          '<td><button class="copybtn" data-copy="code" data-id="'+r.id+'">Copy code</button> <button class="copybtn" data-copy="layer" data-id="'+r.id+'">Copy layer</button></td>'+
+        '</tr>';
+      }).join('');
+      wrap.innerHTML = '<table class="datatable"><thead><tr>'+
+        '<th data-col="code">Code No.'+arrow('code')+'</th>'+
+        '<th data-col="name">Layer Name'+arrow('name')+'</th>'+
+        '<th data-col="layerCode">Layer Code'+arrow('layerCode')+'</th>'+
+        '<th data-col="category">Category'+arrow('category')+'</th>'+
+        '<th>Description</th><th></th>'+
+        '</tr></thead><tbody>'+rows+'</tbody></table>';
+      wrap.querySelectorAll('th[data-col]').forEach(function(th){
+        th.addEventListener('click', function(){
+          var col = th.dataset.col;
+          if(state.dbSort.col===col) state.dbSort.dir *= -1;
+          else state.dbSort = {col:col, dir:1};
+          renderDbTable();
+        });
+      });
+      wireResultRows(wrap, pageData);
+    }
+    // pagination controls
+    var pager = document.getElementById('dbPagination');
+    if(totalPages<=1){ pager.innerHTML=''; }
+    else{
+      var btns = '';
+      for(var p=1;p<=totalPages;p++){
+        if(p===1||p===totalPages||Math.abs(p-state.dbPage)<=1){
+          btns += '<button class="'+(p===state.dbPage?'active':'')+'" data-page="'+p+'">'+p+'</button>';
+        } else if(btns.slice(-3)!=='...'){
+          btns += '<span style="padding:0 4px;color:var(--ink-faint);">…</span>';
+        }
+      }
+      pager.innerHTML = '<span>Page '+state.dbPage+' of '+totalPages+'</span><div class="pages">'+
+        '<button data-page="prev" '+(state.dbPage===1?'disabled':'')+'>‹ Prev</button>'+
+        btns+
+        '<button data-page="next" '+(state.dbPage===totalPages?'disabled':'')+'>Next ›</button>'+
+      '</div>';
+      pager.querySelectorAll('button[data-page]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var p = btn.dataset.page;
+          if(p==='prev') state.dbPage = Math.max(1,state.dbPage-1);
+          else if(p==='next') state.dbPage = Math.min(totalPages,state.dbPage+1);
+          else state.dbPage = parseInt(p,10);
+          renderDbTable();
+        });
+      });
+    }
+  }
+  document.getElementById('dbFilterInput').addEventListener('input', function(){ state.dbPage=1; renderDbTable(); });
+  document.getElementById('dbCategoryFilter').addEventListener('change', function(){ state.dbPage=1; renderDbTable(); });
+
+  // ---------- export ----------
+  function toRows(data){
+    return data.map(function(r){
+      return {'CODE NO.':r.code, 'LAYER NAME':r.name, 'LAYER CODE':r.layerCode||'', 'CATEGORY':r.category||'General', 'DESCRIPTION':r.description||''};
+    });
+  }
+  function exportCsv(){
+    var rows = toRows(getDbFiltered().data.length? getDataset() : getDataset());
+    var headers = Object.keys(rows[0]||{'CODE NO.':'','LAYER NAME':'','LAYER CODE':'','CATEGORY':'','DESCRIPTION':''});
+    var csv = headers.join(',') + '\n' + rows.map(function(r){
+      return headers.map(function(h){
+        var v = String(r[h]==null?'':r[h]);
+        if(v.indexOf(',')!==-1||v.indexOf('"')!==-1){ v = '"'+v.replace(/"/g,'""')+'"'; }
+        return v;
+      }).join(',');
+    }).join('\n');
+    var blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'pdo_survey_feature_code_database.csv';
+    a.click();
+    toast('CSV exported');
+  }
+  function exportXlsx(){
+    if(typeof XLSX==='undefined'){ toast('Excel export library unavailable — use CSV export instead'); return; }
+    var rows = toRows(getDataset());
+    var ws = XLSX.utils.json_to_sheet(rows);
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Feature Codes');
+    XLSX.writeFile(wb, 'pdo_survey_feature_code_database.xlsx');
+    toast('Excel file exported');
+  }
+  document.getElementById('dbExportCsvBtn').addEventListener('click', exportCsv);
+  document.getElementById('dbExportXlsxBtn').addEventListener('click', exportXlsx);
+  document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
+  document.getElementById('exportXlsxBtn').addEventListener('click', exportXlsx);
+
+  // ---------- import ----------
+  document.getElementById('importFile').addEventListener('change', function(e){
+    var file = e.target.files[0];
+    if(!file) return;
+    if(typeof XLSX==='undefined'){ toast('Import library unavailable'); return; }
+    var reader = new FileReader();
+    reader.onload = function(evt){
+      try{
+        var wb = XLSX.read(evt.target.result, {type:'binary'});
+        var ws = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(ws, {defval:''});
+        var added = 0, skipped = 0;
+        var existingCodes = {};
+        getDataset().forEach(function(r){ existingCodes[r.code]=true; });
+        rows.forEach(function(row){
+          var code = row['CODE NO.']!==undefined?row['CODE NO.']:row['Code No.']!==undefined?row['Code No.']:row['code'];
+          var name = row['LAYER NAME']!==undefined?row['LAYER NAME']:row['Layer Name']!==undefined?row['Layer Name']:row['name'];
+          var lc = row['LAYER CODE']!==undefined?row['LAYER CODE']:row['Layer Code']!==undefined?row['Layer Code']:row['layerCode'];
+          if(code===undefined || name===undefined || String(code).trim()==='' || String(name).trim()===''){ skipped++; return; }
+          code = parseInt(code,10);
+          if(isNaN(code)){ skipped++; return; }
+          if(existingCodes[code]){ skipped++; return; }
+          var lcStr = String(lc||'').trim();
+          var lcList = lcStr ? lcStr.split(',').map(function(s){return s.trim().toUpperCase();}).filter(Boolean) : [];
+          var rec = {id:nextId(), code:code, name:String(name).trim(), layerCode:lcStr, layerCodes:lcList, category:row['CATEGORY']||'General', description:row['DESCRIPTION']||''};
+          overrides.added.push(rec);
+          existingCodes[code]=true;
+          added++;
+        });
+        saveOverrides(overrides);
+        refreshAll();
+        toast('Imported '+added+' record'+(added===1?'':'s')+(skipped?', skipped '+skipped+' (duplicate or invalid)':''));
+      }catch(err){
+        toast('Import failed: could not parse file');
+      }
+      e.target.value='';
+    };
+    reader.readAsBinaryString(file);
+  });
+
+  // ---------- reload ----------
+  document.getElementById('reloadBtn').addEventListener('click', function(){
+    if(!confirm('This will discard all local additions, edits and deletions and restore the original master dataset. Continue?')) return;
+    overrides = {added:[], edited:{}, deleted:[]};
+    saveOverrides(overrides);
+    refreshAll();
+    toast('Master dataset restored');
+  });
+
+  // ---------- add / edit form ----------
+  var form = document.getElementById('featureForm');
+  var formSubmitBtn = document.getElementById('formSubmitBtn');
+  var formCancelBtn = document.getElementById('formCancelBtn');
+  function resetForm(){
+    form.reset();
+    form.editId.value='';
+    document.getElementById('formTitle').textContent = 'Add New Feature';
+    document.getElementById('formHint').textContent = 'Feature codes must be unique';
+    formSubmitBtn.textContent = 'Add Feature';
+    formCancelBtn.style.display = 'none';
+  }
+  formCancelBtn.addEventListener('click', resetForm);
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    var fd = new FormData(form);
+    var code = parseInt(fd.get('code'),10);
+    var name = String(fd.get('name')||'').trim();
+    var layerCode = String(fd.get('layerCode')||'').trim();
+    var category = fd.get('category');
+    var description = String(fd.get('description')||'').trim();
+    var editId = fd.get('editId');
+
+    if(isNaN(code) || !name || !layerCode){ toast('Please complete all required fields'); return; }
+    var layerCodes = layerCode.split(',').map(function(s){return s.trim().toUpperCase();}).filter(Boolean);
+
+    var dataset = getDataset();
+    var clash = dataset.find(function(r){ return r.code===code && String(r.id)!==String(editId); });
+    if(clash){ toast('Code '+code+' already exists ('+clash.name+') — choose a unique code'); return; }
+
+    if(editId){
+      overrides.edited[editId] = {code:code, name:name, layerCode:layerCode, layerCodes:layerCodes, category:category, description:description};
+    } else {
+      overrides.added.push({id:nextId(), code:code, name:name, layerCode:layerCode, layerCodes:layerCodes, category:category, description:description});
+    }
+    saveOverrides(overrides);
+    refreshAll();
+    resetForm();
+    toast(editId ? 'Feature updated' : 'Feature added');
+  });
+
+  function startEdit(rec){
+    form.editId.value = rec.id;
+    form.code.value = rec.code;
+    form.name.value = rec.name;
+    form.layerCode.value = rec.layerCode;
+    form.category.value = rec.category || 'General';
+    form.description.value = rec.description || '';
+    document.getElementById('formTitle').textContent = 'Edit Feature — Code '+rec.code;
+    document.getElementById('formHint').textContent = rec.id <= 234 ? 'Editing a master record creates a local override; the source file is never changed' : 'Editing a locally added record';
+    formSubmitBtn.textContent = 'Save Changes';
+    formCancelBtn.style.display = '';
+    form.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  function deleteRecord(rec){
+    if(!confirm('Remove "'+rec.name+'" (Code '+rec.code+') from the working database?')) return;
+    if(rec._new){
+      overrides.added = overrides.added.filter(function(r){ return r.id!==rec.id; });
+    } else {
+      overrides.deleted.push(rec.id);
+      delete overrides.edited[rec.id];
+    }
+    saveOverrides(overrides);
+    refreshAll();
+    toast('Feature removed');
+  }
+
+  // ---------- admin manage table ----------
+  function renderAdminTable(){
+    var q = document.getElementById('adminFilterInput').value.trim();
+    var data = getDataset();
+    if(q) data = data.filter(function(r){ return matchesAny(r,q); });
+    data.sort(function(a,b){ return a.code-b.code; });
+    var totalPages = Math.max(1, Math.ceil(data.length/PAGE_SIZE));
+    if(state.adminPage>totalPages) state.adminPage = totalPages;
+    var start = (state.adminPage-1)*PAGE_SIZE;
+    var pageData = data.slice(start, start+PAGE_SIZE);
+    var wrap = document.getElementById('adminTableWrap');
+    if(!data.length){
+      wrap.innerHTML = '<div class="empty-state"><span class="big">∅</span>No records match this filter.</div>';
+    } else {
+      var rows = pageData.map(function(r){
+        return '<tr data-id="'+r.id+'">'+
+          '<td class="code">'+escapeHtml(r.code)+'</td>'+
+          '<td>'+escapeHtml(r.name)+(r._new?'<span class="badge-new">NEW</span>':'')+(r._modified?'<span class="badge-modified">EDITED</span>':'')+'</td>'+
+          '<td class="lcode">'+escapeHtml(r.layerCode||'—')+'</td>'+
+          '<td><span class="catpill">'+escapeHtml(r.category||'General')+'</span></td>'+
+          '<td><button class="copybtn" data-act="edit" data-id="'+r.id+'">Edit</button> <button class="copybtn" data-act="delete" data-id="'+r.id+'">Delete</button></td>'+
+        '</tr>';
+      }).join('');
+      wrap.innerHTML = '<table class="datatable"><thead><tr><th>Code No.</th><th>Layer Name</th><th>Layer Code</th><th>Category</th><th>Actions</th></tr></thead><tbody>'+rows+'</tbody></table>';
+      wrap.querySelectorAll('button[data-act]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var id = parseInt(btn.dataset.id,10);
+          var rec = data.find(function(r){return r.id===id;});
+          if(!rec) return;
+          if(btn.dataset.act==='edit') startEdit(rec);
+          else deleteRecord(rec);
+        });
+      });
+    }
+    var pager = document.getElementById('adminPagination');
+    if(totalPages<=1){ pager.innerHTML=''; }
+    else{
+      pager.innerHTML = '<span>Page '+state.adminPage+' of '+totalPages+'</span><div class="pages">'+
+        '<button data-page="prev" '+(state.adminPage===1?'disabled':'')+'>‹ Prev</button>'+
+        '<button data-page="next" '+(state.adminPage===totalPages?'disabled':'')+'>Next ›</button>'+
+      '</div>';
+      pager.querySelectorAll('button[data-page]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          if(btn.dataset.page==='prev') state.adminPage = Math.max(1,state.adminPage-1);
+          else state.adminPage = Math.min(totalPages,state.adminPage+1);
+          renderAdminTable();
+        });
+      });
+    }
+  }
+  document.getElementById('adminFilterInput').addEventListener('input', function(){ state.adminPage=1; renderAdminTable(); });
+
+  // ---------- global refresh ----------
+  function refreshAll(){
+    refreshStats();
+    runGlobalSearch();
+    runCodeSearch();
+    runLayerSearch();
+    runNameSearch();
+    renderDbTable();
+    renderAdminTable();
+  }
+
+  refreshAll();
+})();
+</script>
+</body>
+</html>
